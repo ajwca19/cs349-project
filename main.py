@@ -1,6 +1,6 @@
 import pandas as pd
-import spacy
-nlp = spacy.load("en_core_web_sm")
+#import spacy
+#nlp = spacy.load("en_core_web_sm")
 import re
 import sklearn
 from sklearn.feature_extraction.text import TfidfTransformer
@@ -27,7 +27,7 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from sklearn.model_selection import cross_val_score
 
 
-#take in a directory path (as string), return a cleaned dataframe
+#take in a directory path (as string), return a processed dataframe
 def data_preprocessing(path, test=False):
     #start_time = time.time()
     
@@ -85,14 +85,10 @@ def data_preprocessing(path, test=False):
             #do test stuff
             datalist.append([asin,  reviewCount, percentVerified, reviewText, summaryText, rev_mean, rev_stdev, sum_mean, sum_stdev])
             count = count + 1
-            review_group_df = pd.DataFrame(datalist,columns =['asin', 'numReviews', 'percentVerified', 'reviewText', \ 
-                                                              'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', \ 
-                                                              'summaryStDev'])    
         else:
             #do train stuff
             awesomeness = product_df['awesomeness'][count]
             datalist.append([asin,  reviewCount, percentVerified, reviewText, summaryText, rev_mean, rev_stdev, sum_mean, sum_stdev, awesomeness])
-        
             count = count + 1
         
         '''new_row = {'asin': asin, 
@@ -103,10 +99,18 @@ def data_preprocessing(path, test=False):
                    'awesomeness': product_df.loc[product_df['asin'] == asin, 'awesomeness'].values[0]} 
         review_group_df = review_group_df.append(new_row, ignore_index = True)
          '''
+         
+    if test:
         review_group_df = pd.DataFrame(datalist,columns =['asin', 'numReviews', 'percentVerified','reviewText','summaryText', \
-                                                      'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev', 'awesomeness'])    
-    
-    review_group_df.to_json(path + '/cleaned_data.json')
+                                                      'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])    
+    else:
+        review_group_df = pd.DataFrame(datalist,columns =['asin', 'numReviews', 'percentVerified','reviewText','summaryText', \
+                                                          'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev', 'awesomeness'])    
+
+    if test:
+        review_group_df.to_json('cleaned_data_test.json')
+    else:
+        review_group_df.to_json('cleaned_data.json')
     end_time = time.time()
     print(end_time - start_time)
     
@@ -128,16 +132,16 @@ def create_classifier():
     string_transformer = Pipeline(steps = [('vect', CountVectorizer()), ('tfidf', TfidfTransformer())])
     wordbagger = ColumnTransformer(transformers=[("rev", string_transformer, 'reviewText'), ("sum", string_transformer, 'summaryText')], remainder='passthrough')
 
-    clf = Pipeline(steps = [("wordbag", wordbagger), ("scale", MaxAbsScaler()), ('classifier', SVC(kernel='rbf', max_iter = 1e5))])
+    clf = Pipeline(steps = [("wordbag", wordbagger), ("scale", MaxAbsScaler()), ('classifier',  LogisticRegression(max_iter = 500, n_jobs = -1) )])
     
     return clf
 
-def train_classifier(review_group_df):
+def train_classifier(clf, review_group_df):
     review_features = review_group_df.filter(['numReviews', 'percentVerified', 'reviewText', 'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])
     y = review_group_df.filter(['awesomeness'])
-    return clf.fit(review_features, y)
+    return clf.fit(review_features, np.ravel(y))
     
-def cross_validate(review_group_df):
+def cross_validate(clf, review_group_df):
     review_features = review_group_df.filter(['numReviews', 'percentVerified', 'reviewText', 'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])
     y = review_group_df.filter(['awesomeness'])
     start = time.time()
@@ -151,12 +155,31 @@ def cross_validate(review_group_df):
 #take in a trained classifier and test data
 def generate_predictions(review_group_df, clf):
     review_features = review_group_df.filter(['numReviews', 'percentVerified', 'reviewText', 'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])
-    predictions = 
+    predictions = pd.Series(clf.predict(review_features))
+    result_df = pd.DataFrame({'asin': review_group_df['asin'], 'awesomeness': predictions})
+    result_df.to_json('predictions.json')
+    return result_df
     
-    
-if __name__ == '__main__':
-    # dictionary of ASINS and the reviews for the ASIN
-    asin_review_data_train = data_preprocessing("../devided_dataset_v2/CDs_and_Vinyl/train", False)
+## Actually training the model and running it on the test data
 
-# list of ASINS (keys for the dictionary)
-asins = list(asin_review_data_train.keys())
+# generating the cleaned_data json
+#review_group_df_train = data_preprocessing('../devided_dataset_v2/CDs_and_Vinyl/train/', test = False)
+#read in the training data
+review_group_df_train = pd.read_json('cleaned_data.json')
+
+#make the classifier
+clf = create_classifier()
+
+# 10-fold cross-validation on our data
+#cross_validation_results = cross_validate(clf, review_group_df_train)
+#print(cross_validation_results)
+
+# train classifier
+train_classifier(clf, review_group_df_train)
+
+# generate feature vectors from the test data
+#review_group_df_test = data_preprocessing('../devided_dataset_v2/CDs_and_Vinyl/test1/', test = True)
+review_group_df_test = pd.read_json('cleaned_data_test.json')
+
+# generate predictions and save predictions.json to the current directory
+result_df = generate_predictions(review_group_df_test, clf)
