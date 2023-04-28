@@ -214,6 +214,32 @@ def cross_validator(clf, review_group_df):
     print("duration: " + str((end - start)/60))
     return cv10_results
 
+#this function runs hyper-parameter optimization on the given classifier and returns the grid search generated
+def hyper_parameter_optimization(clf, review_group_df):
+    # grab the relevant features
+    review_features = review_group_df.filter(['numReviews', 'percentVerified', 'reviewText', 'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])
+    
+    # grab the awesomeness scores
+    y = review_group_df.filter(['awesomeness'])
+    
+    #create a grid search for the classifier
+    solvers = ['liblinear', 'newton-cg', 'lbfgs', 'sag', 'saga']
+    jobs = [-1]
+    maxiter = [100, 500, 1000]
+    c = [10, 1, 0.1]
+    param_grid={'classifier__C':c, 'classifier__solver':solvers, 'classifier__n_jobs':jobs, 'classifier__max_iter':maxiter}
+    grid_clf = GridSearchCV(clf, param_grid, n_jobs=-1)
+    
+    
+    start = time.time()
+    print("I started at " + str(start))
+    
+    #run grid search optimization
+    grid_clf.fit(review_features, np.ravel(y))
+    
+    end = time.time()
+    print("duration: " + str((end - start)/60))
+
 #This function takes in the test data and a trained classifier, and predicts the awesomeness scores
 # these awesomeness scores are then saved to a dataframe and to the predictions.json output file
 def generate_predictions(review_group_df, clf):
