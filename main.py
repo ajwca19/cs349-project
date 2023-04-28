@@ -11,20 +11,19 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 import time
 import numpy as np
-#from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold
 import statistics
 
 from sklearn.compose import ColumnTransformer
 #from sklearn.compose import make_column_transformer
-#from scipy.sparse import csr_matrix
 #from sklearn import preprocessing
 #from sklearn.svm import LinearSVC, SVC
 from sklearn.preprocessing import StandardScaler, MaxAbsScaler
-#from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score
 import nltk
 nltk.download('vader_lexicon')
 from nltk.sentiment import SentimentIntensityAnalyzer
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, cross_validate
 
 
 # DATA PREPROCESSING FUNCTION
@@ -182,7 +181,7 @@ def create_classifier():
     # a scaler that scales all the data to be between -1 and 1, 
     # and the Logistic Regression Classifier
     # For logistic  regression, we allow it to run for up to 500 iterations, and ask it to parallelize the operations to reduce compute time
-    clf = Pipeline(steps = [("wordbag", wordbagger), ("scale", MaxAbsScaler()), ('classifier',  LogisticRegression(max_iter = 500, n_jobs = -1) )])
+    clf = Pipeline(steps = [("wordbag", wordbagger), ("scale", MaxAbsScaler()), ('classifier',  LogisticRegression(max_iter = 500, solver = "newton-cg", C = 0.1, n_jobs = -1) )])
     
     return clf
 
@@ -199,7 +198,7 @@ def train_classifier(clf, review_group_df):
     return clf.fit(review_features, np.ravel(y))
 
 # This function runs 10-fold cross-validation on the training dataset    
-def cross_validate(clf, review_group_df):
+def cross_validator(clf, review_group_df):
     
     # grab the relevant features
     review_features = review_group_df.filter(['numReviews', 'percentVerified', 'reviewText', 'summaryText', 'reviewMean', 'reviewStDev', 'summaryMean', 'summaryStDev'])
@@ -210,7 +209,7 @@ def cross_validate(clf, review_group_df):
     print("I started at " + str(start))
     
     # this runs the k-fold cross-validation automatically, with 10 folds and parallel computing
-    cv10_results = cross_val_score(clf, review_features, np.ravel(y), cv=10, n_jobs = -1, scoring = 'f1')
+    cv10_results = cross_validate(clf, review_features, np.ravel(y), cv=10, n_jobs = -1, scoring = ['f1_micro', 'precision', 'recall'])
     end = time.time()
     print("duration: " + str((end - start)/60))
     return cv10_results
@@ -236,7 +235,7 @@ review_group_df_train = pd.read_json('cleaned_data.json')
 clf = create_classifier()
 
 # 10-fold cross-validation on our data
-#cross_validation_results = cross_validate(clf, review_group_df_train)
+#cross_validation_results = cross_validator(clf, review_group_df_train)
 #print(cross_validation_results)
 
 # train classifier
