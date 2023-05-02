@@ -253,9 +253,11 @@ def generate_predictions(review_group_df, clf):
 #FUNCTION CALLS
 
 # generating the cleaned_data json
-#review_group_df_train = data_preprocessing('../devided_dataset_v2/CDs_and_Vinyl/train/', test = False)
+review_group_df_train = data_preprocessing('CDs_and_Vinyl/train/', test = False)
 #read in the training data
-review_group_df_train = pd.read_json('cleaned_data.json')
+
+#read in training data from cleaned data
+#review_group_df_train = pd.read_json('cleaned_data.json')
 
 #make the classifier
 clf = create_classifier()
@@ -268,8 +270,10 @@ clf = create_classifier()
 train_classifier(clf, review_group_df_train)
 
 # generate feature vectors from the test data
-#review_group_df_test = data_preprocessing('../devided_dataset_v2/CDs_and_Vinyl/test1/', test = True)
-review_group_df_test = pd.read_json('cleaned_data_test.json')
+review_group_df_test = data_preprocessing('CDs_and_Vinyl/test1/', test = True)
+
+#read in test data from pre-cleaned data
+#review_group_df_test = pd.read_json('cleaned_data_test.json')
 
 # generate predictions and save predictions.json to the current directory
 result_df = generate_predictions(review_group_df_test, clf)
